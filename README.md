@@ -54,6 +54,8 @@ minimum and makes a complete kickoff easier to write:
   agree with it. A split by artifact, one owner per file or component
   with the other as its reviewer, is a recommendation; it does not
   replace the project's own rules for concurrent edits and worktrees.
+  For concurrent edits, use separate working directories, such as git
+  worktrees, and leave the peer's working directory untouched.
 - **Handoff path**, optional. A line `Handoff: <absolute path>` in the
   project's `PLAN.md` (that file specifically; the skill reads it from
   nowhere else) moves the handoff file away from the default

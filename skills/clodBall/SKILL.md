@@ -111,6 +111,13 @@ Re: <timestamp of the entry this answers>
 
 - `Re:` only when replying. Reply to the dated entry you handled, not to
   "the latest".
+- `Ball:` names who responds next to that entry. It is not a lock:
+  independent work continues.
+- A changed request names the earlier request's timestamp and says
+  whether it supplements or replaces it. Unrelated work stays active.
+- Before asking for a final review or a landing, read the handoff and
+  acknowledge new requests that affect your work. Posting a request
+  does not mean the peer has read it.
 - A review reply puts one of `accepted`, `revise`, or `blocked` first in
   `Done:`, with reasons and evidence. A revision is a new entry under the
   same title.
