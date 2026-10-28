@@ -29,6 +29,8 @@ repo's `.gitignore`, or `**/.review/HANDOFF.md` to your global git
 ignore file. The skill proves the ignore with `git check-ignore` before
 it writes.
 
+`VERSION` holds the release version; each release is also a tag `v<VERSION>`.
+
 ## Use
 
 - Claude, in the project's session: `/clodBall` runs one check and
