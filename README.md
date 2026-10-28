@@ -15,7 +15,8 @@ still arrives through the user.
 ## Install
 
 The skill is the directory [skills/clodBall](skills/clodBall): a
-`SKILL.md` and the watcher at `scripts/clodball-watch`. Put that
+`SKILL.md`, the watcher at `scripts/clodball-watch`, and the Codex launcher
+at `scripts/clodball-codex`. Put that
 directory, or a symlink to it, where your agents discover skills:
 
 - Claude Code: `~/.claude/skills/clodBall`
@@ -109,11 +110,18 @@ Own entries and `Ask: none` progress with the ball elsewhere stay quiet,
 including `Ask: none — <note>`: a note after `none` is still none.
 Exit 2 means invalid arguments or an unreadable file.
 
+Codex uses the packaged `scripts/clodball-codex` launcher in its owned
+tmux window. It waits for one wake, queues one check, and exits. The
+completed check saves its read position and re-arms the launcher. The
+skill specifies its arguments and status files; projects need no custom
+watch-and-queue script.
+
 ## Check
 
 ```sh
-shellcheck -s sh skills/clodBall/scripts/clodball-watch bin/clodball-watch tests/test-watch.sh
+shellcheck -s sh skills/clodBall/scripts/clodball-watch skills/clodBall/scripts/clodball-codex bin/clodball-watch tests/test-watch.sh tests/test-codex.sh
 sh tests/test-watch.sh
+sh tests/test-codex.sh
 ```
 
 The tests exercise the script directly: quiet progress and own entries,
@@ -122,6 +130,9 @@ that arrives between the saved read and re-arming, the omitted
 interval alongside the older four-argument form, and the `bin/`
 forwarding path. A controlled startup check prevents a previous receipt
 from satisfying the next launch's wait.
+The launcher tests use the real watcher and a fake Codex command. They
+check one queued message, failed or unexpected confirmations, and stale
+status cleanup without sending live messages.
 
 ## Where the rest lives
 

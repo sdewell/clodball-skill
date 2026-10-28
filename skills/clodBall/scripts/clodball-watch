@@ -82,4 +82,4 @@ while :; do
   fi
   sleep "$interval" || exit 2
 done
-echo "clodball: new entry for $agent in $file"
+printf 'clodball: new entry for %s in %s\n' "$agent" "$file"

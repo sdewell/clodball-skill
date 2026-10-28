@@ -1,0 +1,78 @@
+#!/bin/sh
+# Queue one check after the packaged watcher wakes; the completed check re-arms.
+# Usage: clodball-codex <thread-uuid> <absolute-handoff> <saved-cursor> <absolute-state-dir>
+# The caller owns the state directory and prevents overlapping launches.
+# Exit 2 means invalid arguments or an unverified receipt; child failures retain their status.
+set -eu
+
+die() {
+  echo "clodball-codex: $*" >&2
+  exit 2
+}
+
+is_uuid() {
+  case "$1" in ''|*[!0-9a-fA-F-]*) return 1 ;; esac
+  LC_ALL=C grep -Eq '^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$' <<EOF
+$1
+EOF
+}
+
+[ "$#" -eq 4 ] || die 'supply thread UUID, absolute handoff path, saved cursor, and absolute state directory'
+thread=$1
+handoff=$2
+cursor=$3
+state_dir=$4
+case "$state_dir" in /*) ;; *) die 'state directory must be absolute' ;; esac
+mkdir -p "$state_dir"
+: > "$state_dir/wake.out"
+: > "$state_dir/wake.err"
+: > "$state_dir/queue.out"
+: > "$state_dir/queue.err"
+rm -f "$state_dir/expected-wake.txt" "$state_dir/expected-queue.txt"
+printf '%s\n' invalid-arguments > "$state_dir/phase.txt"
+is_uuid "$thread" || die 'thread must be a UUID'
+thread=$(printf '%s' "$thread" | tr '[:upper:]' '[:lower:]')
+case "$handoff" in /*) ;; *) die 'handoff path must be absolute' ;; esac
+case "$cursor" in ''|*[!0-9]*) die 'saved cursor must be a nonnegative integer' ;; esac
+scripts=$(cd -- "$(dirname -- "$0")" && pwd -P)
+printf '%s\n' watching > "$state_dir/phase.txt"
+if "$scripts/clodball-watch" cx "$handoff" "$cursor" > "$state_dir/wake.out" 2> "$state_dir/wake.err"; then
+  :
+else
+  result=$?
+  printf '%s\n' watcher-failed > "$state_dir/phase.txt"
+  echo "clodball-codex: watcher failed; see $state_dir/wake.err" >&2
+  exit "$result"
+fi
+printf 'clodball: new entry for cx in %s\n' "$handoff" > "$state_dir/expected-wake.txt"
+if ! cmp -s "$state_dir/expected-wake.txt" "$state_dir/wake.out"; then
+  printf '%s\n' invalid-wake-output > "$state_dir/phase.txt"
+  echo "clodball-codex: unexpected watcher output; see $state_dir/wake.out" >&2
+  exit 2
+fi
+printf '%s\n' queuing > "$state_dir/phase.txt"
+if codex queue --thread "$thread" --message "\$clodBall check: new entry in $handoff" > "$state_dir/queue.out" 2> "$state_dir/queue.err"; then
+  :
+else
+  result=$?
+  printf '%s\n' queue-failed > "$state_dir/phase.txt"
+  echo "clodball-codex: queue failed; see $state_dir/queue.err" >&2
+  exit "$result"
+fi
+queue_valid=0
+if IFS= read -r receipt < "$state_dir/queue.out"; then
+  message_id=${receipt#'Queued message '}
+  message_id=${message_id%" for thread $thread."}
+  if is_uuid "$message_id"; then
+    printf 'Queued message %s for thread %s.\n' "$message_id" "$thread" > "$state_dir/expected-queue.txt"
+    if cmp -s "$state_dir/expected-queue.txt" "$state_dir/queue.out"; then
+      queue_valid=1
+    fi
+  fi
+fi
+if [ "$queue_valid" -ne 1 ]; then
+  printf '%s\n' queue-outcome-uncertain > "$state_dir/phase.txt"
+  echo "clodball-codex: queue confirmation is uncertain; inspect $state_dir/queue.out before retrying" >&2
+  exit 2
+fi
+printf '%s\n' queued > "$state_dir/phase.txt"

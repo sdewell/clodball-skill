@@ -72,7 +72,7 @@ peer verifies it on its next tick. Timers run regardless; only the
 project work waits.
 
 ```
-## <from> → <to>: kickoff — <YYYY-MM-DDTHH:MMZ>
+## <from> → <to>: kickoff — <YYYY-MM-DDTHH:MM:SSZ>
 
 Goal: <one sentence, and the plan section that holds the current state>
 Done-when: <the check that proves the goal is met: a command, a file, a landed PR>
@@ -101,7 +101,7 @@ Ball: claude | cx
 ## Entry format
 
 ```
-## <from> → <to>: <title> — <YYYY-MM-DDTHH:MMZ>
+## <from> → <to>: <title> — <YYYY-MM-DDTHH:MM:SSZ>
 
 Done: <what, with the sha, PR number, or path, and the check that proves it>
 Ask: <what the other agent does next, or "none">
@@ -122,7 +122,7 @@ Re: <timestamp of the entry this answers>
   `Done:`, with reasons and evidence. A revision is a new entry under the
   same title.
 - The timestamp comes from the clock, read in the same turn as the
-  append: `date -u +%Y-%m-%dT%H:%MZ`. Never from memory or an earlier
+  append: `date -u +%Y-%m-%dT%H:%M:%SZ`. Never from memory or an earlier
   turn: a session's sense of the time drifts by tens of minutes, and
   `Re:` keys on the stamp, so a wrong stamp becomes the reply key.
   Existing stamps stay as written: replies already reference them.
@@ -231,15 +231,23 @@ would wake again on the same entry. Keep that delay cancellable by stop.
   job's completion notification is the wake: run one check, then arm
   it again with the new cursor. The user never types the watcher
   command.
-- Codex: run one watcher with `cx` in a session-owned tmux window. On
-  success, queue exactly one check with
-  `codex queue --thread <id> --message '$clodBall check: new entry in <path>'`,
-  then let the window exit. The queued check reads a new snapshot and
-  re-arms the watcher with its cursor. Do not re-arm in an autonomous
-  shell loop: delivery is not a completed read. If queuing fails,
-  preserve the cursor and report the failure. A Codex scheduling tool,
-  if one is exposed, is an acceptable substitute at the 3-minute
-  fallback cadence: it is a model check, not a watcher.
+- Codex: run the packaged launcher in a session-owned tmux window:
+  `scripts/clodball-codex <thread-uuid> <absolute-handoff-path> <saved-cursor> <absolute-state-dir>`.
+  Resolve the script from this skill's directory. Keep `codex` on PATH
+  and use a state directory owned by this session, with no overlapping
+  launch. The launcher uses the watcher's default interval, validates
+  its wake, queues exactly one check, validates Codex's confirmation,
+  then exits. `phase.txt` retains the last recorded phase: `watching`,
+  `queuing`, `queued`, `invalid-arguments`, `watcher-failed`,
+  `invalid-wake-output`, `queue-failed`, or `queue-outcome-uncertain`.
+  `wake.out`, `wake.err`, `queue.out`, and `queue.err` hold the
+  latest launch's output. `queue-outcome-uncertain` means inspect the
+  receipt before retrying: the check may already be queued.
+  The queued check reads a new snapshot and re-arms with its cursor.
+  Do not re-arm in an autonomous shell loop: delivery is not a completed
+  read. On failure, preserve the cursor and report the failure. A Codex
+  scheduling tool, if exposed, is an acceptable substitute at the
+  3-minute fallback cadence: it is a model check, not a watcher.
 - Keep one watcher or timer per session. Track its job or tmux window
   identifier and stop it when the session or collaboration ends. A
   restarted session checks the file before re-arming. Verify the saved
