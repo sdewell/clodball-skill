@@ -1,0 +1,85 @@
+#!/bin/sh
+# clodball-watch: wake once when a peer entry needs an agent.
+#
+# Usage: clodball-watch <claude|cx> <absolute handoff path> [<interval-seconds>] <last-read-line>
+#
+# The interval defaults to 30 seconds when omitted, so a
+# cadence change lands here once and reaches every caller at its next re-arm;
+# a caller that still passes an interval is accepted unchanged.
+# last-read-line is the newline count of the snapshot the caller handled.
+# The caller treats one stdout line as "run one check". The file is read-only.
+# Exit 2 means invalid arguments, a missing file, or a failed poll.
+set -u
+
+default_interval=30
+agent=${1:-}
+file=${2:-}
+case "$#" in
+  3) interval=$default_interval; cursor=$3 ;;
+  4) interval=$3; cursor=$4 ;;
+  *) echo 'clodball-watch: supply agent, file, optional interval, and last-read-line' >&2; exit 2 ;;
+esac
+
+case "$agent" in
+  claude|cx) ;;
+  *) echo "clodball-watch: agent must be claude or cx, got '$agent'" >&2; exit 2 ;;
+esac
+case "$interval" in
+  ''|*[!0-9]*) echo 'clodball-watch: interval must be a positive integer' >&2; exit 2 ;;
+  *[1-9]*) ;;
+  *) echo 'clodball-watch: interval must be a positive integer' >&2; exit 2 ;;
+esac
+case "$cursor" in
+  ''|*[!0-9]*) echo 'clodball-watch: last-read-line must be a nonnegative integer' >&2; exit 2 ;;
+esac
+if [ ! -f "$file" ]; then
+  echo "clodball-watch: no such file: $file" >&2
+  exit 2
+fi
+
+pending() {
+  # Read older headers too: the cursor can fall between an entry header and Ask.
+  awk -v agent="$agent" -v cursor="$cursor" '
+    /^## (claude|cx) → / {
+      sender = ""
+      recipient = ""
+      if (($2 == "claude" || $2 == "cx") && $3 == "→") {
+        sender = $2
+        recipient = $4
+        sub(/:$/, "", recipient)
+      }
+    }
+    NR > cursor && sender != "" && sender != agent {
+      if ($0 == "Ball: " agent || $0 == "Ball: none") found = 1
+      if ($0 ~ /^Ask: /) {
+        ask = substr($0, 6)
+        sub(/^[[:space:]]+/, "", ask)
+        sub(/[[:space:]]+$/, "", ask)
+        ask = tolower(ask)
+        target = recipient
+        if (ask ~ /^claude[,:]/) target = "claude"
+        if (ask ~ /^cx[,:]/) target = "cx"
+        # "none" alone, or "none" followed by a note ("none — ...", "none, ...").
+        if (ask != "" && ask !~ /^none([^[:alnum:]]|$)/ && target == agent) found = 1
+      }
+    }
+    END {
+      if (NR < cursor) exit 2
+      exit found ? 0 : 1
+    }
+  ' "$file"
+}
+
+while :; do
+  if pending; then
+    break
+  else
+    status=$?
+  fi
+  if [ "$status" -ne 1 ]; then
+    echo "clodball-watch: cannot poll $file at last-read-line $cursor" >&2
+    exit 2
+  fi
+  sleep "$interval" || exit 2
+done
+echo "clodball: new entry for $agent in $file"

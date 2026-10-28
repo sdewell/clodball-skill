@@ -1,0 +1,4 @@
+#!/bin/sh
+# Compatibility path: the watcher lives in the skill folder so the skill is
+# self-contained. Saved wrappers in projects still call bin/clodball-watch.
+exec "$(dirname "$0")/../skills/clodBall/scripts/clodball-watch" "$@"

@@ -1,0 +1,20 @@
+# Quality workflow for the public clodBall release: lint and test the
+# watcher. Trigger is workflow_dispatch only; the release process runs it.
+name: quality
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  watcher:
+    name: watcher script
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: shellcheck
+        run: shellcheck -s sh skills/clodBall/scripts/clodball-watch bin/clodball-watch tests/test-watch.sh
+      - name: test
+        run: sh tests/test-watch.sh
