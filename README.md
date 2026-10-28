@@ -31,6 +31,20 @@ it writes.
 
 `VERSION` holds the release version; each release is also a tag `v<VERSION>`.
 
+## Requirements
+
+- macOS or Linux. The watcher and its tests are POSIX `sh` with `awk`
+  and `sleep`; the repo's workflow runs them on Ubuntu, and the skill is
+  developed and used on macOS. Windows is untested: the watcher needs a
+  POSIX shell (Git Bash or WSL), and skill discovery there is not
+  covered here.
+- Claude Code that can run a Bash job in the background; the watcher
+  runs as one.
+- Codex with `tmux` and `codex queue`, which the skill uses for Codex's
+  checker.
+- `git`: the skill proves the handoff file is ignored before it writes.
+- `shellcheck`, only to run the checks below.
+
 ## Use
 
 - Claude, in the project's session: `/clodBall` runs one check and
