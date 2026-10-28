@@ -85,6 +85,9 @@ Ball: claude | cx
 - The project's plan must already say the goal and the current state.
   If it does not, the kickoff's `Ask:` is to update the plan first, not
   to start work.
+- The kickoff names the plan file and section. Its goal, `Done-when:`,
+  and `Owns:` lines must agree with any corresponding statement in that
+  plan; resolve a discrepancy before project work begins.
 - A kickoff missing any line, or absent: request it with one entry,
   `Ball:` to the writer, naming what is missing. Keep checking on the
   timer; begin the assigned work once the kickoff is complete. Never

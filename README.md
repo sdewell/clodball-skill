@@ -31,6 +31,38 @@ it writes.
 
 `VERSION` holds the release version; each release is also a tag `v<VERSION>`.
 
+## Before the first kickoff: the project's plan
+
+The handoff file is the conversation; the project's plan is the record.
+Before project work begins, the skill instructs the agents to check
+that the project's plan states the goal and the current state; either
+agent can help prepare or update it. The kickoff entry points to the
+plan section that holds them. The checklist below is more than that
+minimum and makes a complete kickoff easier to write:
+
+- **Goal.** One sentence an agent can check against.
+- **Current state.** What exists now and what is known to be broken.
+  An agent that reads only this section should be able to continue.
+- **Completion check.** The command, file, or landed PR that proves
+  the goal met. The kickoff's `Done-when:` line must agree with it.
+- **Next step.** The one thing to do next, so the first `Ask:` is
+  concrete.
+- **Who does what.** Which parts Claude builds and reviews, and which
+  parts Codex builds and reviews. The kickoff's two `Owns:` lines must
+  agree with it. A split by artifact, one owner per file or component
+  with the other as its reviewer, is a recommendation; it does not
+  replace the project's own rules for concurrent edits and worktrees.
+- **Handoff path**, optional. A line `Handoff: <absolute path>` in the
+  project's `PLAN.md` (that file specifically; the skill reads it from
+  nowhere else) moves the handoff file away from the default
+  `<main checkout>/.review/HANDOFF.md`.
+
+If the goal or current state is missing, the kickoff's first `Ask:` is
+to update the plan. The kickoff must also carry its completion check,
+ownership, and first concrete ask. Watchers keep checking while that
+preparation is completed. Rewrite the current state and next step as
+work lands; a goal change is a new kickoff entry.
+
 ## Requirements
 
 - macOS or Linux. The watcher and its tests are POSIX `sh` with `awk`
