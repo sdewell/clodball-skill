@@ -2,7 +2,7 @@
 
 > **Purpose:** what clodBall is, how to install it, and how to use it. **Use:** read first; update when the install or the invocation changes.
 
-![clodBall: Claude and Codex handoff](assets/clodball-lockup.png)
+![clodBall: Claude and Codex handoff](assets/clodball-lockup-2.png)
 
 clodBall is a handoff routine for two coding agents, Claude Code and
 Codex, working one project together. It is one append-only file per
