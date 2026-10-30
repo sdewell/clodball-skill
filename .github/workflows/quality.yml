@@ -15,8 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: shellcheck
-        run: shellcheck -s sh skills/clodBall/scripts/clodball-watch skills/clodBall/scripts/clodball-codex bin/clodball-watch tests/test-watch.sh tests/test-codex.sh
+        run: shellcheck -s sh skills/clodBall/scripts/clodball-watch skills/clodBall/scripts/clodball-codex skills/clodBall/scripts/clodball-status bin/clodball-watch tests/test-watch.sh tests/test-codex.sh tests/test-status.sh
       - name: test
         run: sh tests/test-watch.sh
       - name: Codex launcher
         run: sh tests/test-codex.sh
+      - name: Status report
+        run: sh tests/test-status.sh

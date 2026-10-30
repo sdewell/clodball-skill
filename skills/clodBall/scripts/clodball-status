@@ -1,0 +1,193 @@
+#!/bin/sh
+# clodball-status: print what can be seen about a handoff, and change nothing.
+#
+# Usage: clodball-status <absolute handoff path> [<absolute launcher state dir> ...]
+#
+# Reads the handoff file, the process list, the skill files, and each state
+# directory's phase.txt and queue.out. It writes no file, starts no watcher,
+# and never calls codex or tmux. It reports facts only: it does not say that
+# an entry was read, delivered, answered, or resolved, because files cannot
+# show that. Exit 2 means invalid arguments; anything else exits 0.
+set -u
+
+die() {
+  echo "clodball-status: $*" >&2
+  exit 2
+}
+
+[ "$#" -ge 1 ] || die 'supply an absolute handoff path and optional launcher state directories'
+handoff=$1
+shift
+for path in "$handoff" "$@"; do
+  case "$path" in /*) ;; *) die "path must be absolute: $path" ;; esac
+done
+
+# Lines of "pid<TAB>agent<TAB>cursor<TAB>state" for processes whose command is
+# the script $1 (directly, or as the second word after a plain shell) and whose
+# first path argument is this handoff. A wrapper that only mentions the script
+# later in its arguments is not a match.
+procs() {
+  printf '%s\n' "$psout" | KIND=$1 H=$handoff awk '
+    function drop(s) { sub(/^[^ \t]+[ \t]*/, "", s); return s }
+    function word(s) { sub(/[ \t].*/, "", s); return s }
+    function base(s) { sub(/.*\//, "", s); return s }
+    {
+      s = $0; sub(/^[ \t]+/, "", s)
+      pid = word(s); s = drop(s)
+      b = base(word(s)); s = drop(s)
+      if (b != ENVIRON["KIND"]) {
+        if (b !~ /^(sh|bash|dash)$/ || base(word(s)) != ENVIRON["KIND"]) next
+        s = drop(s)
+      }
+      first = word(s); s = drop(s)
+      h = ENVIRON["H"]
+      if (index(s, h) != 1) next
+      s = substr(s, length(h) + 1)
+      if (s != "" && substr(s, 1, 1) !~ /[ \t]/) next
+      sub(/^[ \t]+/, "", s)
+      if (ENVIRON["KIND"] == "clodball-watch") {
+        n = split(s, w, /[ \t]+/)
+        print pid "\t" first "\t" w[n] "\t"
+      } else {
+        print pid "\t" first "\t" word(s) "\t" drop(s)
+      }
+    }'
+}
+
+# Lines of "sender recipient title ts ball target re", tab separated, one per entry.
+# The stamp is the text after the LAST " — " in the header. Ball and Ask follow
+# the watcher rule for who an entry is addressed to.
+entries_of() {
+  awk '
+    function flush() { if (n) print sender "\t" recipient "\t" title "\t" ts "\t" ball "\t" target "\t" re }
+    function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+    # Only an agent header starts an entry; a "## Findings" body heading does not.
+    /^## (claude|cx) → / {
+      flush(); n = 0
+      if (($2 == "claude" || $2 == "cx") && $3 == "→") {
+        n = 1; sender = $2; recipient = $4; sub(/:$/, "", recipient)
+        ball = ""; target = ""; re = ""
+        h = $0; sub(/^## [^ ]+ → [^ ]+ /, "", h)
+        sep = " — "; off = 0; pos = 0; rest = h
+        while ((i = index(rest, sep)) > 0) { pos = off + i; off = pos; rest = substr(rest, i + 1) }
+        title = pos ? substr(h, 1, pos - 1) : h
+        ts = pos ? substr(h, pos + length(sep)) : ""
+      }
+      next
+    }
+    n && /^Ball: / && ball == "" { ball = trim(substr($0, 7)) }
+    n && /^Re: / && re == "" { re = trim(substr($0, 5)) }
+    n && /^Ask: / {
+      ask = tolower(trim(substr($0, 6)))
+      t = recipient
+      if (ask ~ /^claude[,:]/) t = "claude"
+      if (ask ~ /^cx[,:]/) t = "cx"
+      if (ask != "" && ask !~ /^none([^[:alnum:]]|$)/) target = t
+    }
+    END { flush() }
+  ' "$handoff"
+}
+
+if [ -f "$handoff" ] && [ -r "$handoff" ]; then
+  readable=yes
+else
+  readable=no
+fi
+git -C "$(dirname -- "$handoff")" check-ignore -q "$handoff" 2>/dev/null
+case $? in 0) ignored=yes ;; 1) ignored=no ;; *) ignored=unknown ;; esac
+echo "Handoff: $handoff"
+echo "  readable: $readable"
+[ "$readable" = yes ] || echo '  note: handoff missing or unreadable; entries not read'
+echo "  ignored: $ignored"
+
+found() { [ -e "$1" ] && echo found || echo missing; }
+echo "Skill files: claude $(found "$HOME/.claude/skills/clodBall/SKILL.md"), codex $(found "$HOME/.agents/skills/clodBall/SKILL.md") (files only; host discovery unknown)"
+tools=
+for tool in git awk tmux codex; do
+  if command -v "$tool" > /dev/null 2>&1; then tools="$tools $tool ok,"; else tools="$tools $tool missing,"; fi
+done
+echo "Tools:${tools%,}"
+
+# A failed listing proves nothing about processes: report unknown, not "none".
+if psout=$(ps -A -o pid= -o args= 2> /dev/null); then ps_ok=yes; else ps_ok=no; psout=; fi
+watchers=$(procs clodball-watch)
+launchers=$(procs clodball-codex)
+for agent in claude cx; do
+  if [ "$ps_ok" = no ]; then
+    echo "Watcher $agent: unknown (process list unavailable)"
+    continue
+  fi
+  printf '%s\n' "$watchers" | awk -F'\t' -v a="$agent" '
+    $2 == a { printf "Watcher %s: running pid %s cursor %s\n", a, $1, $3; n++ }
+    END {
+      if (!n) printf "Watcher %s: none running\n", a
+      if (n > 1) printf "Duplicate: %d watchers for %s on this handoff (not stopped)\n", n, a
+    }'
+done
+
+entries=
+[ "$readable" = yes ] && entries=$(entries_of)
+
+{ printf '%s\n' "$@"; printf '%s\n' "$launchers" | awk -F'\t' '$4 != "" { print $4 }'; } |
+  awk 'NF && !seen[$0]++' |
+  while IFS= read -r dir; do
+    phase=
+    [ -r "$dir/phase.txt" ] && { IFS= read -r phase < "$dir/phase.txt" || :; }
+    pid=$(printf '%s\n' "$launchers" | D=$dir awk -F'\t' '$4 == ENVIRON["D"] { print $1; exit }')
+    receipt=
+    [ -r "$dir/queue.out" ] && { IFS= read -r receipt < "$dir/queue.out" || :; }
+    echo "Launcher state $dir:"
+    mtime=unknown
+    if [ -n "$phase" ]; then
+      mtime=$(date -u -r "$dir/phase.txt" +%Y-%m-%dT%H:%M:%SZ 2> /dev/null) || mtime=unknown
+      echo "  recorded phase: $phase at $mtime"
+    else
+      echo '  recorded phase: none'
+    fi
+    if [ "$ps_ok" = no ]; then
+      echo '  live launcher: unknown (process list unavailable)'
+      pid=unknown
+    elif [ -n "$pid" ]; then echo "  live launcher: yes pid $pid"; else echo '  live launcher: no'; fi
+    echo "  receipt: ${receipt:-none}"
+    case "$phase:$pid" in
+      watching:|queuing:) echo '  note: recorded phase is stale; no launcher process is running' ;;
+      queued:) echo '  note: queued and launcher exited (normal); queued is not read' ;;
+      queue-outcome-uncertain:*) echo '  note: queue outcome uncertain; inspect queue.out before retrying' ;;
+    esac
+    if [ "$phase" = queued ]; then
+      after=$(printf '%s\n' "$entries" | awk -F'\t' -v m="$mtime" '$1 == "cx" && $4 >= m { print $4; exit }')
+      echo "  cx entry after queue: ${after:-not found}"
+    fi
+  done
+
+if [ "$readable" = no ]; then
+  printf '%s\n' 'Last entry claude: unknown' 'Last entry cx: unknown' 'Kickoff: unknown' 'Requests: unknown'
+  exit 0
+fi
+printf '%s\n' "$entries" | awk -F'\t' '
+  NF { s[++n] = $1; ti[n] = $3; ts[n] = $4; ball[n] = $5; tg[n] = $6; re[n] = $7 }
+  END {
+    split("claude cx", agents, " ")
+    for (a = 1; a <= 2; a++) {
+      last = 0
+      for (i = 1; i <= n; i++) if (s[i] == agents[a]) last = i
+      if (last) print "Last entry " agents[a] ": " ti[last] " " ts[last]
+      else print "Last entry " agents[a] ": none"
+    }
+    k = 0
+    for (i = 1; i <= n; i++) if (ti[i] == "kickoff") k = i
+    print "Kickoff: " (k ? ts[k] : "none")
+    count = 0
+    for (i = (k ? k : 1); i <= n; i++) {
+      for (a = 1; a <= 2; a++) {
+        who = agents[a]
+        if (s[i] == who || (ball[i] != who && tg[i] != who)) continue
+        cited = "no"; later = "no"
+        for (j = i + 1; j <= n; j++) if (s[j] == who) { later = "yes"; if (ts[i] != "" && re[j] == ts[i]) cited = "yes" }
+        print "Request for " who ": " ts[i] " " ti[i] " — cited in " who "\047s Re: " cited "; later " who " entry: " later
+        count++
+      }
+    }
+    if (!count) print "Requests: none"
+  }'
+exit 0

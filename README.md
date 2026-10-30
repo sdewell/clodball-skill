@@ -116,12 +116,17 @@ completed check saves its read position and re-arms the launcher. The
 skill specifies its arguments and status files; projects need no custom
 watch-and-queue script.
 
+`scripts/clodball-status <absolute handoff path> [<absolute state dir> ...]`
+prints what the files and processes show about a handoff, its watchers,
+and any launcher state directory. It changes nothing.
+
 ## Check
 
 ```sh
-shellcheck -s sh skills/clodBall/scripts/clodball-watch skills/clodBall/scripts/clodball-codex bin/clodball-watch tests/test-watch.sh tests/test-codex.sh
+shellcheck -s sh skills/clodBall/scripts/clodball-watch skills/clodBall/scripts/clodball-codex skills/clodBall/scripts/clodball-status bin/clodball-watch tests/test-watch.sh tests/test-codex.sh tests/test-status.sh
 sh tests/test-watch.sh
 sh tests/test-codex.sh
+sh tests/test-status.sh
 ```
 
 The tests exercise the script directly: quiet progress and own entries,

@@ -66,7 +66,8 @@ the peer's judgment, never the user's word.
 ## Before project work: the kickoff entry
 
 Before starting project work, verify the current collaboration's
-**kickoff**: the most recent entry titled `kickoff`. Later replies do
+**kickoff**: the most recent entry whose title is exactly `kickoff`
+(not `kickoff — confirmed`). Later replies do
 not invalidate it. Whoever starts the collaboration writes it; the
 peer verifies it on its next tick. Timers run regardless; only the
 project work waits.
@@ -137,8 +138,16 @@ Re: <timestamp of the entry this answers>
 1. Copy the shared file to a session-owned scratch snapshot before reading.
    Record its complete line count with `wc -l`. Read **every** unread entry
    in that snapshot, including an entry that crosses the previous cursor
-   (the saved last-read line number). On the first check, use your own last
-   entry as the starting point. On later checks, use the previous cursor:
+   (the saved last-read line number). With no verified saved cursor, read
+   from the current collaboration's kickoff and reconcile requests against
+   subsequent replies before establishing a new snapshot cursor. If no
+   kickoff exists, read from the beginning and request the missing kickoff.
+   Treat a request as resolved only when a reply establishes its outcome
+   through `Re:`, explicitly replaces it, or provides evidence that its work
+   is done. A later entry alone closes nothing; a `started` acknowledgement
+   leaves the request open.
+   Check existing evidence before repeating consequential actions. On later
+   checks, use the previous cursor:
    your reply might follow a peer entry you have not read yet. A restart
    after `/clodBall stop` in the same session is a later check: start from
    the saved cursor, never from your own last entry.
@@ -261,7 +270,9 @@ would wake again on the same entry. Keep that delay cancellable by stop.
 
 1. An agent that judges the kickoff's `Done-when` met appends an entry
    titled `closed`, with the evidence of that check in `Done:` and
-   `Ball:` the peer.
+   `Ball:` the peer. When follow-up work remains, such as landing or a
+   release, the entry names its owner and where its outcome will be
+   recorded.
 2. The peer's next tick re-runs the `Done-when` check itself. Met: it
    appends `closed — confirmed`, `Ball: none`, stops its timer, and the
    collaboration is over. Not met: it replies `revise` with what is
