@@ -4,6 +4,8 @@
 
 ![clodBall: Claude and Codex handoff](assets/clodball-lockup-2.png)
 
+![Parallel or staged workflows: Claude and Codex build a sign-up feature on two lanes, passing the ball for reviews, a prerequisite, and the final check](assets/parallel-or-staged-workflows.png)
+
 clodBall is a handoff routine for two coding agents, Claude Code and
 Codex, working one project together. It is one append-only file per
 project, one skill both agents read, and one small watcher script that
